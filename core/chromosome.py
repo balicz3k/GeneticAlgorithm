@@ -45,6 +45,10 @@ class Chromosome:
             decoded_vars.append(real_val)
             
         return decoded_vars
+
+    def invert_bit(self, index: int) -> None:
+        if -len(self.bits) <= index < len(self.bits):
+            self.bits[index] = 1 - self.bits[index]
         
     def clone(self):
         return Chromosome(self.bounds, self.precision, bits=self.bits.copy())
