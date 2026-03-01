@@ -28,3 +28,4 @@ class Population:
     def get_best_individual(self) -> Chromosome:
         best = max(self.individuals, key=lambda chrom: chrom.fitness)
         return best.clone()
+        
