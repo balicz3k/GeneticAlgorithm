@@ -51,4 +51,6 @@ class Chromosome:
             self.bits[index] = 1 - self.bits[index]
         
     def clone(self):
-        return Chromosome(self.bounds, self.precision, bits=self.bits.copy())
+        cloned = Chromosome(self.bounds, self.precision, bits=self.bits.copy())
+        cloned.fitness = self.fitness
+        return cloned
