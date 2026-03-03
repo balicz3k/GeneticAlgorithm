@@ -4,15 +4,14 @@ import time
 from typing import List, Dict, Any
 from utils.config import AlgorithmConfig, OptimizationTarget
 from core.population import Population
-from core.chromosome import Chromosome
+# from core.chromosome import Chromosome
+from utils.stats import Stats
 
 class GeneticAlgorithm:
     def __init__(self, config: AlgorithmConfig):
         self.config = config
-        
-        self.is_max = (config.target == OptimizationTarget.MAXIMIZE)
-
-        self.best_history: List[float] = []
+        self.is_maximization = (config.target == OptimizationTarget.MAXIMIZE)
+        self.stats = []
 
     def run(self) -> Dict[str, Any]:
         start_time = time.time()
@@ -20,16 +19,16 @@ class GeneticAlgorithm:
         # --- PHASE 0: POPULATION INITIALIZATION ---
         current_population = Population(
             size=self.config.population_size,
+            is_maximization=self.is_maximization,
             bounds=self.config.bounds,
             precision=self.config.precision,
             fitness_func=self.config.fitness_func
         )
-        current_population.evaluate_fitness(is_maximization=self.is_max)
+        current_population.evaluate_fitness()
         
         best_overall = current_population.get_best_individual()
-        
-        actual_fitness = best_overall.fitness if self.is_max else -best_overall.fitness
-        self.best_history.append(actual_fitness)
+        worst_overall = current_population.get_worst_individual()
+        self._update_stats(current_population, best_overall.fitness, worst_overall.fitness)
 
         for epoch in range(1, self.config.epochs + 1):
             new_individuals = []
@@ -75,25 +74,35 @@ class GeneticAlgorithm:
 
             # --- PHASE 4: POPULATION EVALUATION ---
             current_population.individuals = new_individuals
-            current_population.evaluate_fitness(is_maximization=self.is_max)
+            current_population.evaluate_fitness()
 
             # --- PHASE 5: STATISTICS UPDATE ---
             epoch_best = current_population.get_best_individual()
+            epoch_worst = current_population.get_worst_individual()
             
             if epoch_best.fitness > best_overall.fitness:
                 best_overall = epoch_best.clone()
-
-            run_fitness = best_overall.fitness if self.is_max else -best_overall.fitness
-            self.best_history.append(run_fitness)
+            if epoch_worst.fitness < worst_overall.fitness:
+                worst_overall = epoch_worst.clone()
+            self._update_stats(current_population, best_overall.fitness, worst_overall.fitness)
 
         # --- PHASE 6: RETURN RESULTS ---
         end_time = time.time()
         execution_time = end_time - start_time
         
         return {
-            "best_chromosome": best_overall.bits.tolist(),
+            "best_chromosome_bits": best_overall.bits.tolist(),
             "best_decoded_values": best_overall.get_decoded_values(),
-            "best_fitness_value": best_overall.fitness if self.is_max else -best_overall.fitness,
-            "history_stats": self.best_history,
-            "execution_time": execution_time
+            "best_fitness_value": best_overall.fitness,
+            "execution_time": execution_time,
+            "stats": self.stats
         }
+
+    def _update_stats(self, current_population: Population, best_overall: float, worst_overall: float):
+        stats = Stats()
+        stats.best = current_population.get_best_fittness()
+        stats.worst = current_population.get_worst_fittness()
+        stats.avg = current_population.get_average_fittness()
+        stats.best_overall = best_overall
+        stats.worst_overall = worst_overall
+        self.stats.append(stats)

@@ -1,4 +1,6 @@
 import customtkinter as ctk
+import os
+import csv
 from tkinter import messagebox
 from typing import Dict, Any, Optional
 
@@ -216,6 +218,7 @@ class App(ctk.CTk):
         try:
             ga = GeneticAlgorithm(config)
             self.last_results = ga.run()
+            self._save_stats_to_csv()
             
             # Formatted Results String
             result_text = f"Evolutiom engine completed successfully after {config.epochs} epochs.\n"
@@ -229,7 +232,7 @@ class App(ctk.CTk):
             result_text += f"> [ {vars_str} ]\n\n"
             
             result_text += f"[ WINNING GENETIC DNA (BITS) ]\n"
-            dna_str = ''.join(map(str, self.last_results['best_chromosome']))
+            dna_str = ''.join(map(str, self.last_results['best_chromosome_bits']))
             # Slicing the long binary string to fit nicely in the window
             dna_lines = [dna_str[i:i+60] for i in range(0, len(dna_str), 60)]
             result_text += "> " + "\n  ".join(dna_lines) + "\n\n"
@@ -244,7 +247,6 @@ class App(ctk.CTk):
                 time_str = f"{exec_time:.4f} s"
                 
             result_text += f"Computation Time: {time_str}\n"
-            result_text += "Data stored in application memory. Ready for plotting.\n"
 
             self.results_textbox.configure(state="normal")
             self.results_textbox.delete("0.0", "end")
@@ -255,6 +257,40 @@ class App(ctk.CTk):
             messagebox.showerror("Execution Error", f"Genetic engine crashed during runtime:\n{e}")
         finally:
             self.btn_run.configure(state="normal", text="RUN EXPERIMENT")
+    
+    def _save_stats_to_csv(self):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        filename = os.path.join(project_root, "stats.csv")
+
+        if not self.last_results or 'stats' not in self.last_results:
+            return
+            
+        stats_list = self.last_results['stats']
+        
+        with open(filename, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            
+            writer.writerow([
+                "Epoch", 
+                "Best In Epoch", 
+                "Worst In Epoch", 
+                "Average In Epoch", 
+                "Best Overall", 
+                "Worst Overall"
+            ])
+            
+            for epoch_number, stat_obj in enumerate(stats_list, start=1):
+                writer.writerow([
+                    epoch_number,
+                    stat_obj.best,
+                    stat_obj.worst,
+                    stat_obj.avg,
+                    stat_obj.best_overall,
+                    stat_obj.worst_overall
+                ])
+                
+        print(f"Dane wyeksportowane poprawnie do pliku: {filename}")
 
 if __name__ == "__main__":
     ctk.set_appearance_mode("dark")
