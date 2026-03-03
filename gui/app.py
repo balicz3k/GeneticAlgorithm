@@ -222,10 +222,10 @@ class App(ctk.CTk):
             result_text += "-"*75 + "\n\n"
             
             result_text += f"[ MATHEMATICAL TARGET VALUE (Y) ]\n"
-            result_text += f"> {self.last_results['best_fitness_value']:.10f}\n\n"
+            result_text += f"> {self.last_results['best_fitness_value']:.{config.precision}f}\n\n"
             
             result_text += f"[ BEST DECODED VARIABLES (X) ]\n"
-            vars_str = ',  '.join([f"{v:.5f}" for v in self.last_results['best_decoded_values']])
+            vars_str = ',  '.join([f"{v:.{config.precision}f}" for v in self.last_results['best_decoded_values']])
             result_text += f"> [ {vars_str} ]\n\n"
             
             result_text += f"[ WINNING GENETIC DNA (BITS) ]\n"
@@ -235,6 +235,15 @@ class App(ctk.CTk):
             result_text += "> " + "\n  ".join(dna_lines) + "\n\n"
             
             result_text += "-"*75 + "\n"
+            
+            # Format elapsed time nicely
+            exec_time = self.last_results.get('execution_time', 0.0)
+            if exec_time < 0.001:
+                time_str = f"{exec_time * 1000:.2f} ms"
+            else:
+                time_str = f"{exec_time:.4f} s"
+                
+            result_text += f"Computation Time: {time_str}\n"
             result_text += "Data stored in application memory. Ready for plotting.\n"
 
             self.results_textbox.configure(state="normal")

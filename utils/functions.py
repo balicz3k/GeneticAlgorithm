@@ -9,8 +9,13 @@ def hyperellipsoid_function(variables: List[float]) -> float:
         total_sum += sum(variables[j] ** 2 for j in range(i + 1))
     return total_sum
 
-# Rejestr funkcji, który zostanie przetłumaczony na rozwijaną listę (Dropdown) w GUI
+def martin_and_gaddy_function(variables: List[float]) -> float:
+    if(len(variables) != 2):
+        raise ValueError("Martin and Gaddy function requires exactly 2 variables")
+    return (variables[0] - variables[1]) ** 2 + ((variables[0] + variables[1] - 10) / 3) ** 2
+
 AVAILABLE_FUNCTIONS = {
     "Sphere": sphere_function,
-    "Hyperellipsoid": hyperellipsoid_function
+    "Hyperellipsoid": hyperellipsoid_function,
+    "Martin and Gaddy": martin_and_gaddy_function,
 }

@@ -42,6 +42,9 @@ class Chromosome:
             
             real_val = a + decimal_val * (b - a) / ((2 ** m) - 1)
             
+            # Format to the actual precision defined
+            real_val = round(real_val, self.precision)
+            
             decoded_vars.append(real_val)
             
         return decoded_vars

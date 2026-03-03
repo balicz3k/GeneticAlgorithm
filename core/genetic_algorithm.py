@@ -1,5 +1,6 @@
 import numpy as np
 import copy
+import time
 from typing import List, Dict, Any
 from utils.config import AlgorithmConfig, OptimizationTarget
 from core.population import Population
@@ -14,6 +15,8 @@ class GeneticAlgorithm:
         self.best_history: List[float] = []
 
     def run(self) -> Dict[str, Any]:
+        start_time = time.time()
+        
         # --- PHASE 0: POPULATION INITIALIZATION ---
         current_population = Population(
             size=self.config.population_size,
@@ -84,9 +87,13 @@ class GeneticAlgorithm:
             self.best_history.append(run_fitness)
 
         # --- PHASE 6: RETURN RESULTS ---
+        end_time = time.time()
+        execution_time = end_time - start_time
+        
         return {
             "best_chromosome": best_overall.bits.tolist(),
             "best_decoded_values": best_overall.get_decoded_values(),
             "best_fitness_value": best_overall.fitness if self.is_max else -best_overall.fitness,
-            "history_stats": self.best_history
+            "history_stats": self.best_history,
+            "execution_time": execution_time
         }
