@@ -11,11 +11,11 @@ def hyperellipsoid_function(variables: List[float]) -> float:
 
 def martin_and_gaddy_function(variables: List[float]) -> float:
     if(len(variables) != 2):
-        raise ValueError("Martin and Gaddy function requires exactly 2 variables")
+        raise ValueError("Martin & Gaddy function requires exactly 2 variables")
     return (variables[0] - variables[1]) ** 2 + ((variables[0] + variables[1] - 10) / 3) ** 2
 
 AVAILABLE_FUNCTIONS = {
     "Sphere": sphere_function,
     "Hyperellipsoid": hyperellipsoid_function,
-    "Martin and Gaddy": martin_and_gaddy_function,
+    "Martin & Gaddy": martin_and_gaddy_function,
 }

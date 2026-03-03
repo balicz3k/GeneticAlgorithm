@@ -1,5 +1,4 @@
 from typing import List, Tuple, Callable
-import copy
 from core.chromosome import Chromosome
 
 class Population:
