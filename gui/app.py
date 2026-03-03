@@ -88,7 +88,7 @@ class App(ctk.CTk):
         self.last_csv_path = None
 
     def init_variables(self):
-        self.var_function = ctk.StringVar(value="Martin & Gaddy")
+        self.var_function = ctk.StringVar(value=list(AVAILABLE_FUNCTIONS.keys())[0])
         self.var_target = ctk.StringVar(value="MINIMIZE")
         self.var_num_vars = ctk.StringVar(value="2")
         self.var_bound_min = ctk.StringVar(value="-65.536")
