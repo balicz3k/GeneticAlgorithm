@@ -58,8 +58,15 @@ class GeneticAlgorithm:
 
                 if np.random.rand() < self.config.mutation_probability:
                     self.config.mutation_strategy.mutate(child1)
+                
+                if self.config.inversion_strategy and np.random.rand() < self.config.inversion_probability:
+                    self.config.inversion_strategy.invert(child1)
+
                 if np.random.rand() < self.config.mutation_probability:
                     self.config.mutation_strategy.mutate(child2)
+                    
+                if self.config.inversion_strategy and np.random.rand() < self.config.inversion_probability:
+                    self.config.inversion_strategy.invert(child2)
 
                 new_individuals.append(child1)
                 if len(new_individuals) < self.config.population_size:

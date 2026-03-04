@@ -5,6 +5,7 @@ from typing import List, Tuple, Callable
 from operators.selection import SelectionStrategy
 from operators.crossover import CrossoverStrategy
 from operators.mutation import MutationStrategy
+from operators.inversion import InversionStrategy
 
 class OptimizationTarget(Enum):
     MAXIMIZE = "maximize"
@@ -29,3 +30,4 @@ class AlgorithmConfig:
     selection_strategy: SelectionStrategy = None
     crossover_strategy: CrossoverStrategy = None
     mutation_strategy: MutationStrategy = None
+    inversion_strategy: InversionStrategy = None

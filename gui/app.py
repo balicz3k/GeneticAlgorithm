@@ -10,6 +10,7 @@ from utils.functions import AVAILABLE_FUNCTIONS
 from operators.selection import BestSelection, RouletteSelection, TournamentSelection
 from operators.crossover import OnePointCrossover, TwoPointCrossover, UniformCrossover, DiscreteCrossover
 from operators.mutation import MarginalMutation, OnePointMutation, TwoPointMutation
+from operators.inversion import ClassicalInversion
 from core.genetic_algorithm import GeneticAlgorithm
 
 from gui.charts_panel import ChartsPanel
@@ -106,6 +107,7 @@ class App(ctk.CTk):
         self.var_sel_strategy = ctk.StringVar(value="Tournament")
         self.var_cross_strategy = ctk.StringVar(value="TwoPoint")
         self.var_mut_strategy = ctk.StringVar(value="OnePoint")
+        self.var_inv_strategy = ctk.StringVar(value="Classical")
 
     def build_config_ui(self):
         row_id = 0
@@ -153,6 +155,7 @@ class App(ctk.CTk):
         add_dropdown("Selection Method:", self.var_sel_strategy, ["Tournament", "Roulette", "Best"])
         add_dropdown("Crossover Method:", self.var_cross_strategy, ["OnePoint", "TwoPoint", "Uniform", "Discrete"])
         add_dropdown("Mutation Method:", self.var_mut_strategy, ["Marginal", "OnePoint", "TwoPoint"])
+        add_dropdown("Inversion Method:", self.var_inv_strategy, ["Classical"])
 
 
     def _validate_inputs(self) -> Optional[AlgorithmConfig]:
@@ -195,6 +198,9 @@ class App(ctk.CTk):
                 "OnePoint": OnePointMutation(),
                 "TwoPoint": TwoPointMutation()
             }
+            i_map = {
+                "Classical": ClassicalInversion()
+            }
 
             return AlgorithmConfig(
                 fitness_func=func_pointer, bounds=bounds, precision=prec, target=target,
@@ -202,7 +208,8 @@ class App(ctk.CTk):
                 cross_probability=p_cross, mutation_probability=p_mut, inversion_probability=p_inv,
                 selection_strategy=s_map[self.var_sel_strategy.get()],
                 crossover_strategy=c_map[self.var_cross_strategy.get()],
-                mutation_strategy=m_map[self.var_mut_strategy.get()]
+                mutation_strategy=m_map[self.var_mut_strategy.get()],
+                inversion_strategy=i_map[self.var_inv_strategy.get()]
             )
 
         except ValueError as e:
@@ -295,7 +302,6 @@ class App(ctk.CTk):
                 ])
                 
         self.last_csv_path = filename
-        print(f"Dane wyeksportowane poprawnie do pliku: {filename}")
 
     # --- NAVIGATION ---
     def show_chart_view(self):
