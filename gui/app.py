@@ -229,6 +229,7 @@ class App(ctk.CTk):
 
         try:
             ga = GeneticAlgorithm(config)
+            self.last_config = config
             self.last_results = ga.run()
             self._save_stats_to_csv()
             
@@ -307,7 +308,7 @@ class App(ctk.CTk):
     def show_chart_view(self):
         self.main_container.grid_remove()
         self.charts_container.grid(row=0, column=0, sticky="nsew")
-        self.charts_container.load_data(self.last_csv_path, self.last_results['best_fitness_value'])
+        self.charts_container.load_data(self.last_csv_path, self.last_results['best_fitness_value'], getattr(self, 'last_config', None))
 
     def show_main_view(self):
         self.charts_container.grid_remove()
