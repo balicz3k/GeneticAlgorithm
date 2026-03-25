@@ -4,13 +4,18 @@ import csv
 from tkinter import messagebox
 from typing import Dict, Any, Optional
 
-from utils.config import AlgorithmConfig, OptimizationTarget
+from utils.config import AlgorithmConfig, OptimizationTarget, RepresentationType
 from utils.functions import AVAILABLE_FUNCTIONS
 
 from operators.selection import BestSelection, RouletteSelection, TournamentSelection
 from operators.crossover import OnePointCrossover, TwoPointCrossover, UniformCrossover, DiscreteCrossover
 from operators.mutation import MarginalMutation, OnePointMutation, TwoPointMutation
 from operators.inversion import ClassicalInversion
+from operators.real_crossover import (
+    ArithmeticCrossover, LinearCrossover, BlendAlphaCrossover,
+    BlendAlphaBetaCrossover, AverageCrossover
+)
+from operators.real_mutation import UniformMutation, GaussianMutation
 from core.genetic_algorithm import GeneticAlgorithm
 
 from gui.charts_panel import ChartsPanel
@@ -89,6 +94,7 @@ class App(ctk.CTk):
         self.last_csv_path = None
 
     def init_variables(self):
+        self.var_representation = ctk.StringVar(value="Binary")
         self.var_function = ctk.StringVar(value=list(AVAILABLE_FUNCTIONS.keys())[0])
         self.var_target = ctk.StringVar(value="MINIMIZE")
         self.var_num_vars = ctk.StringVar(value="2")
@@ -112,25 +118,39 @@ class App(ctk.CTk):
     def build_config_ui(self):
         row_id = 0
 
+        # Referencje na widgety, które trzeba dynamicznie chować/pokazywać
+        self.dynamic_widgets = {}
+
         def add_header(text):
             nonlocal row_id
             header = ctk.CTkLabel(self.config_frame, text=text, font=("Inter", 14, "bold"), text_color="#569cd6")
             header.grid(row=row_id, column=0, columnspan=2, pady=(20, 5), sticky="w")
             row_id += 1
+            return header
 
-        def add_entry(label_text, variable):
+        def add_entry(label_text, variable, tag=None):
             nonlocal row_id
-            ctk.CTkLabel(self.config_frame, text=label_text).grid(row=row_id, column=0, sticky="w", pady=5, padx=(5, 10))
+            lbl = ctk.CTkLabel(self.config_frame, text=label_text)
+            lbl.grid(row=row_id, column=0, sticky="w", pady=5, padx=(5, 10))
             entry = ctk.CTkEntry(self.config_frame, textvariable=variable, width=140)
             entry.grid(row=row_id, column=1, sticky="e", pady=5, padx=5)
+            if tag:
+                self.dynamic_widgets[tag] = (lbl, entry, row_id)
             row_id += 1
 
-        def add_dropdown(label_text, variable, options):
+        def add_dropdown(label_text, variable, options, tag=None, command=None):
             nonlocal row_id
-            ctk.CTkLabel(self.config_frame, text=label_text).grid(row=row_id, column=0, sticky="w", pady=5, padx=(5, 10))
-            opt = ctk.CTkOptionMenu(self.config_frame, variable=variable, values=options, width=140)
+            lbl = ctk.CTkLabel(self.config_frame, text=label_text)
+            lbl.grid(row=row_id, column=0, sticky="w", pady=5, padx=(5, 10))
+            opt = ctk.CTkOptionMenu(self.config_frame, variable=variable, values=options, width=140, command=command)
             opt.grid(row=row_id, column=1, sticky="e", pady=5, padx=5)
+            if tag:
+                self.dynamic_widgets[tag] = (lbl, opt, row_id)
             row_id += 1
+            return opt
+
+        add_header("0. Representation")
+        add_dropdown("Chromosome Type:", self.var_representation, ["Binary", "Real"], command=self._on_representation_change)
 
         add_header("1. Environment & Objective")
         add_dropdown("Objective Function:", self.var_function, list(AVAILABLE_FUNCTIONS.keys()))
@@ -138,24 +158,95 @@ class App(ctk.CTk):
         add_entry("Number of Variables:", self.var_num_vars)
         add_entry("Lower Bound (Min):", self.var_bound_min)
         add_entry("Upper Bound (Max):", self.var_bound_max)
-        add_entry("Number Precision:", self.var_precision)
+        add_entry("Number Precision:", self.var_precision, tag="precision")
 
         add_header("2. Epochs & Engine")
         add_entry("Population Size:", self.var_pop_size)
         add_entry("Generations (Epochs):", self.var_epochs)
-        ctk.CTkCheckBox(self.config_frame, text="Enable Elitism (Save the Best)", variable=self.var_elitism).grid(row=row_id, column=0, columnspan=2, sticky="w", pady=10, padx=5)
+        self.elitism_check = ctk.CTkCheckBox(self.config_frame, text="Enable Elitism (Save the Best)", variable=self.var_elitism)
+        self.elitism_check.grid(row=row_id, column=0, columnspan=2, sticky="w", pady=10, padx=5)
         row_id += 1
         
         add_header("3. Evolutionary Probabilities")
         add_entry("Crossover Chance (Pc):", self.var_cross_prob)
         add_entry("Mutation Chance (Pm):", self.var_mut_prob)
-        add_entry("Inversion Chance (Pi):", self.var_inv_prob)
+        add_entry("Inversion Chance (Pi):", self.var_inv_prob, tag="inv_prob")
 
         add_header("4. Operator Strategies")
         add_dropdown("Selection Method:", self.var_sel_strategy, ["Tournament", "Roulette", "Best"])
-        add_dropdown("Crossover Method:", self.var_cross_strategy, ["OnePoint", "TwoPoint", "Uniform", "Discrete"])
-        add_dropdown("Mutation Method:", self.var_mut_strategy, ["Marginal", "OnePoint", "TwoPoint"])
-        add_dropdown("Inversion Method:", self.var_inv_strategy, ["Classical"])
+        
+        # Crossover dropdown — zmienny zależnie od reprezentacji
+        self.cross_dropdown = add_dropdown(
+            "Crossover Method:", self.var_cross_strategy, 
+            ["OnePoint", "TwoPoint", "Uniform", "Discrete"],
+            tag="crossover"
+        )
+        # Mutation dropdown
+        self.mut_dropdown = add_dropdown(
+            "Mutation Method:", self.var_mut_strategy,
+            ["Marginal", "OnePoint", "TwoPoint"],
+            tag="mutation"
+        )
+        # Inversion dropdown
+        add_dropdown("Inversion Method:", self.var_inv_strategy, ["Classical"], tag="inversion")
+
+    def _on_representation_change(self, value=None):
+        """Dynamicznie przełącza widoczne opcje operatorów zależnie od reprezentacji."""
+        is_real = self.var_representation.get() == "Real"
+
+        # Precision — ukryj dla real
+        if "precision" in self.dynamic_widgets:
+            lbl, entry, _ = self.dynamic_widgets["precision"]
+            if is_real:
+                lbl.grid_remove()
+                entry.grid_remove()
+            else:
+                lbl.grid()
+                entry.grid()
+
+        # Inversion probability — ukryj dla real
+        if "inv_prob" in self.dynamic_widgets:
+            lbl, entry, _ = self.dynamic_widgets["inv_prob"]
+            if is_real:
+                lbl.grid_remove()
+                entry.grid_remove()
+            else:
+                lbl.grid()
+                entry.grid()
+
+        # Inversion method — ukryj dla real
+        if "inversion" in self.dynamic_widgets:
+            lbl, opt, _ = self.dynamic_widgets["inversion"]
+            if is_real:
+                lbl.grid_remove()
+                opt.grid_remove()
+            else:
+                lbl.grid()
+                opt.grid()
+
+        # Crossover — zmień opcje
+        if "crossover" in self.dynamic_widgets:
+            _, opt, _ = self.dynamic_widgets["crossover"]
+            if is_real:
+                real_options = ["Arithmetic", "Linear", "BLX-alpha", "BLX-alpha-beta", "Averaging"]
+                opt.configure(values=real_options)
+                self.var_cross_strategy.set("Arithmetic")
+            else:
+                bin_options = ["OnePoint", "TwoPoint", "Uniform", "Discrete"]
+                opt.configure(values=bin_options)
+                self.var_cross_strategy.set("TwoPoint")
+
+        # Mutation — zmień opcje
+        if "mutation" in self.dynamic_widgets:
+            _, opt, _ = self.dynamic_widgets["mutation"]
+            if is_real:
+                real_options = ["Uniform", "Gaussian"]
+                opt.configure(values=real_options)
+                self.var_mut_strategy.set("Gaussian")
+            else:
+                bin_options = ["Marginal", "OnePoint", "TwoPoint"]
+                opt.configure(values=bin_options)
+                self.var_mut_strategy.set("OnePoint")
 
 
     def _validate_inputs(self) -> Optional[AlgorithmConfig]:
@@ -170,46 +261,75 @@ class App(ctk.CTk):
             p_mut = float(self.var_mut_prob.get())
             p_inv = float(self.var_inv_prob.get())
 
+            is_real = self.var_representation.get() == "Real"
+            representation = RepresentationType.REAL if is_real else RepresentationType.BINARY
+
             if num_vars < 1: raise ValueError("Variable count must be at least 1.")
             if b_min >= b_max: raise ValueError("Lower bound must be strictly less than upper bound.")
             if pop < 2: raise ValueError("Population size must be at least 2. (Evolution needs pairs!)")
             if ep < 1: raise ValueError("Number of epochs must be greater than 0.")
-            for p, name in [(p_cross, 'Crossover'), (p_mut, 'Mutation'), (p_inv, 'Inversion')]:
+            for p, name in [(p_cross, 'Crossover'), (p_mut, 'Mutation')]:
                 if not (0.0 <= p <= 1.0): 
                     raise ValueError(f"{name} probability must be a float between 0.0 and 1.0.")
+            if not is_real:
+                if not (0.0 <= p_inv <= 1.0):
+                    raise ValueError("Inversion probability must be a float between 0.0 and 1.0.")
 
             bounds = [(b_min, b_max) for _ in range(num_vars)]
             func_pointer = AVAILABLE_FUNCTIONS[self.var_function.get()]
             target = OptimizationTarget.MAXIMIZE if self.var_target.get() == "MAXIMIZE" else OptimizationTarget.MINIMIZE
 
+            # Selection (wspólna dla obu reprezentacji)
             s_map = {
                 "Tournament": TournamentSelection(tournament_size=3),
                 "Roulette": RouletteSelection(),
                 "Best": BestSelection()
             }
-            c_map = {
-                "OnePoint": OnePointCrossover(),
-                "TwoPoint": TwoPointCrossover(),
-                "Uniform": UniformCrossover(),
-                "Discrete": DiscreteCrossover(prob=0.5)
-            }
-            m_map = {
-                "Marginal": MarginalMutation(),
-                "OnePoint": OnePointMutation(),
-                "TwoPoint": TwoPointMutation()
-            }
-            i_map = {
-                "Classical": ClassicalInversion()
-            }
+
+            if is_real:
+                # Krzyżowanie rzeczywiste
+                c_map = {
+                    "Arithmetic": ArithmeticCrossover(),
+                    "Linear": LinearCrossover(fitness_func=func_pointer),
+                    "BLX-alpha": BlendAlphaCrossover(alpha=0.5),
+                    "BLX-alpha-beta": BlendAlphaBetaCrossover(alpha=0.75, beta=0.25),
+                    "Averaging": AverageCrossover(),
+                }
+                # Mutacja rzeczywista
+                m_map = {
+                    "Uniform": UniformMutation(),
+                    "Gaussian": GaussianMutation(sigma=1.0),
+                }
+                inversion_strategy = None
+            else:
+                # Krzyżowanie binarne
+                c_map = {
+                    "OnePoint": OnePointCrossover(),
+                    "TwoPoint": TwoPointCrossover(),
+                    "Uniform": UniformCrossover(),
+                    "Discrete": DiscreteCrossover(prob=0.5)
+                }
+                # Mutacja binarna
+                m_map = {
+                    "Marginal": MarginalMutation(),
+                    "OnePoint": OnePointMutation(),
+                    "TwoPoint": TwoPointMutation()
+                }
+                i_map = {
+                    "Classical": ClassicalInversion()
+                }
+                inversion_strategy = i_map[self.var_inv_strategy.get()]
 
             return AlgorithmConfig(
                 fitness_func=func_pointer, bounds=bounds, precision=prec, target=target,
+                representation=representation,
                 population_size=pop, epochs=ep, elitism=self.var_elitism.get(),
-                cross_probability=p_cross, mutation_probability=p_mut, inversion_probability=p_inv,
+                cross_probability=p_cross, mutation_probability=p_mut, 
+                inversion_probability=p_inv if not is_real else 0.0,
                 selection_strategy=s_map[self.var_sel_strategy.get()],
                 crossover_strategy=c_map[self.var_cross_strategy.get()],
                 mutation_strategy=m_map[self.var_mut_strategy.get()],
-                inversion_strategy=i_map[self.var_inv_strategy.get()]
+                inversion_strategy=inversion_strategy if not is_real else None
             )
 
         except ValueError as e:
@@ -233,8 +353,10 @@ class App(ctk.CTk):
             self.last_results = ga.run()
             self._save_stats_to_csv()
             
-            result_text = f"Evolutiom engine completed successfully after {config.epochs} epochs.\n"
+            result_text = f"Evolution engine completed successfully after {config.epochs} epochs.\n"
             result_text += "-"*75 + "\n\n"
+            
+            result_text += f"[ REPRESENTATION: {'REAL' if config.representation == RepresentationType.REAL else 'BINARY'} ]\n\n"
             
             result_text += f"[ MATHEMATICAL TARGET VALUE (Y) ]\n"
             result_text += f"> {self.last_results['best_fitness_value']:.{config.precision}f}\n\n"
@@ -243,10 +365,15 @@ class App(ctk.CTk):
             vars_str = ',  '.join([f"{v:.{config.precision}f}" for v in self.last_results['best_decoded_values']])
             result_text += f"> [ {vars_str} ]\n\n"
             
-            result_text += f"[ WINNING GENETIC DNA (BITS) ]\n"
-            dna_str = ''.join(map(str, self.last_results['best_chromosome_bits']))
-            dna_lines = [dna_str[i:i+60] for i in range(0, len(dna_str), 60)]
-            result_text += "> " + "\n  ".join(dna_lines) + "\n\n"
+            if config.representation == RepresentationType.BINARY:
+                result_text += f"[ WINNING GENETIC DNA (BITS) ]\n"
+                dna_str = ''.join(map(str, self.last_results['best_chromosome_bits']))
+                dna_lines = [dna_str[i:i+60] for i in range(0, len(dna_str), 60)]
+                result_text += "> " + "\n  ".join(dna_lines) + "\n\n"
+            else:
+                result_text += f"[ WINNING GENE VALUES ]\n"
+                genes_str = ',  '.join([f"{g:.6f}" for g in self.last_results['best_chromosome_genes']])
+                result_text += f"> [ {genes_str} ]\n\n"
             
             result_text += "-"*75 + "\n"
             
@@ -287,7 +414,8 @@ class App(ctk.CTk):
                 "Epoch", 
                 "Best In Epoch", 
                 "Worst In Epoch", 
-                "Average In Epoch", 
+                "Average In Epoch",
+                "Std Dev In Epoch", 
                 "Best Overall", 
                 "Worst Overall"
             ])
@@ -298,6 +426,7 @@ class App(ctk.CTk):
                     stat_obj.best,
                     stat_obj.worst,
                     stat_obj.avg,
+                    stat_obj.std_dev,
                     stat_obj.best_overall,
                     stat_obj.worst_overall
                 ])

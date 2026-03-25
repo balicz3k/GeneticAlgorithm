@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Optional
 
 from operators.selection import SelectionStrategy
 from operators.crossover import CrossoverStrategy
@@ -11,6 +11,10 @@ class OptimizationTarget(Enum):
     MAXIMIZE = "maximize"
     MINIMIZE = "minimize"
 
+class RepresentationType(Enum):
+    BINARY = "binary"
+    REAL = "real"
+
 @dataclass
 class AlgorithmConfig:
     fitness_func: Callable[[List[float]], float] 
@@ -20,7 +24,8 @@ class AlgorithmConfig:
 
     population_size: int     
     epochs: int
-    
+
+    representation: RepresentationType = RepresentationType.BINARY
     elitism: bool = True
 
     cross_probability: float = 0.8  
