@@ -37,7 +37,7 @@ class ChartsPanel(ctk.CTkFrame):
         self.chart_type_var = ctk.StringVar(value="Best (Epoch)")
         self.chart_selector = ctk.CTkSegmentedButton(
             self.top_bar, 
-            values=["Best (Epoch)", "Worst (Epoch)", "Best Overall", "Worst Overall", "Average Value", "Function Shape"],
+            values=["Best (Epoch)", "Worst (Epoch)", "Best Overall", "Worst Overall", "Average Value", "Std Dev", "Function Shape"],
             variable=self.chart_type_var,
             command=self.render_chart
         )
@@ -158,6 +158,9 @@ class ChartsPanel(ctk.CTkFrame):
             elif chart_type == "Average Value":
                 ax.plot(epochs, df['Average In Epoch'], label='Population Average', color='#9c27b0', linewidth=2)
                 ax.set_title("Average Fitness of the Population over Time")
+            elif chart_type == "Std Dev":
+                ax.plot(epochs, df['Std Dev In Epoch'], label='Std Deviation', color='#ff5722', linewidth=2)
+                ax.set_title("Standard Deviation of Fitness over Time")
     
             ax.set_xlabel("Epoch (Generations)")
             ax.set_ylabel("Fitness Value")

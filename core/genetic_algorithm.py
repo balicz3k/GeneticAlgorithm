@@ -2,7 +2,7 @@ import numpy as np
 import copy
 import time
 from typing import List, Dict, Any
-from utils.config import AlgorithmConfig, OptimizationTarget
+from utils.config import AlgorithmConfig, OptimizationTarget, RepresentationType
 from core.population import Population
 from utils.stats import Stats
 
@@ -20,7 +20,8 @@ class GeneticAlgorithm:
             is_maximization=self.is_maximization,
             bounds=self.config.bounds,
             precision=self.config.precision,
-            fitness_func=self.config.fitness_func
+            fitness_func=self.config.fitness_func,
+            representation=self.config.representation.value
         )
         current_population.evaluate_fitness()
         
@@ -59,14 +60,17 @@ class GeneticAlgorithm:
                 if np.random.rand() < self.config.mutation_probability:
                     self.config.mutation_strategy.mutate(child1)
                 
-                if self.config.inversion_strategy and np.random.rand() < self.config.inversion_probability:
-                    self.config.inversion_strategy.invert(child1)
+                # Inwersja tylko dla binarnej reprezentacji
+                if self.config.representation == RepresentationType.BINARY:
+                    if self.config.inversion_strategy and np.random.rand() < self.config.inversion_probability:
+                        self.config.inversion_strategy.invert(child1)
 
                 if np.random.rand() < self.config.mutation_probability:
                     self.config.mutation_strategy.mutate(child2)
                     
-                if self.config.inversion_strategy and np.random.rand() < self.config.inversion_probability:
-                    self.config.inversion_strategy.invert(child2)
+                if self.config.representation == RepresentationType.BINARY:
+                    if self.config.inversion_strategy and np.random.rand() < self.config.inversion_probability:
+                        self.config.inversion_strategy.invert(child2)
 
                 new_individuals.append(child1)
                 if len(new_individuals) < self.config.population_size:
@@ -88,19 +92,27 @@ class GeneticAlgorithm:
         end_time = time.time()
         execution_time = end_time - start_time
         
-        return {
-            "best_chromosome_bits": best_overall.bits.tolist(),
+        result = {
             "best_decoded_values": best_overall.get_decoded_values(),
             "best_fitness_value": best_overall.fitness,
             "execution_time": execution_time,
             "stats": self.stats
         }
 
+        # Klucze specyficzne dla reprezentacji
+        if self.config.representation == RepresentationType.BINARY:
+            result["best_chromosome_bits"] = best_overall.bits.tolist()
+        else:
+            result["best_chromosome_genes"] = best_overall.genes.tolist()
+
+        return result
+
     def _update_stats(self, current_population: Population, best_overall: float, worst_overall: float):
         stats = Stats()
         stats.best = current_population.get_best_fittness()
         stats.worst = current_population.get_worst_fittness()
         stats.avg = current_population.get_average_fittness()
+        stats.std_dev = current_population.get_std_dev_fitness()
         stats.best_overall = best_overall
         stats.worst_overall = worst_overall
         self.stats.append(stats)

@@ -5,3 +5,4 @@ class Stats:
         self.worst: float = 0.0
         self.worst_overall: float = 0.0
         self.avg: float = 0.0
+        self.std_dev: float = 0.0
