@@ -1,9 +1,14 @@
-"""
-Skrypt do przeprowadzania eksperymentów optymalizacyjnych przy użyciu biblioteki PyGAD.
-Testuje różne metody selekcji, krzyżowania i mutacji dla dwóch typów reprezentacji:
-- Binarnej (gene_type=int)
-- Rzeczywistej (gene_type=float)
-Generuje wykresy porównawcze i tabelę wyników do Sprawozdania Projektu 3.
+"""Eksperymenty PyGAD do Sprawozdania Projektu 3.
+
+Układ eksperymentów odpowiada wytycznym P3 — porównujemy 3 selekcje,
+4 krzyżowania (w tym autorskie ``custom_crossover_func`` z example_03)
+oraz 3 mutacje (w tym autorską ``custom_mutation_func``).
+Dla każdej reprezentacji (binarnej i rzeczywistej) generujemy wykresy
+zbieżności oraz dodatkowy wykres best/mean/std dla wybranej konfiguracji.
+
+Fitness w :mod:`pygad_runner` jest postaci ``1 / (f(x) + EPS)`` (jak w
+example_01/02/03), więc wszystkie selekcje PyGAD-a (w tym ``rws``) działają
+poprawnie nawet dla funkcji o minimum w zerze (Martin & Gaddy).
 """
 import os
 import time
@@ -30,7 +35,7 @@ BOUNDS = [(-20, 20), (-20, 20)]
 NUM_VARS = 2
 BITS_PER_VAR = 30
 POP_SIZE = 100
-EPOCHS = 150
+EPOCHS = 100
 N_RUNS = 3  # Uśrednienie wyników
 
 IMG_DIR = "img_pygad"
@@ -189,7 +194,14 @@ def generate_comparisons():
     
     if HAS_PYGAD:
         runner = PyGADRunner(func=FUNC, bounds=BOUNDS, num_vars=NUM_VARS, bits_per_var=BITS_PER_VAR)
-        demo_res = runner.run_experiment(is_binary=False, parent_selection_type="tournament", crossover_type="two_points", mutation_type="random")
+        # Demonstracyjny przebieg z włączonym parallel_processing (wzór z example_02/03).
+        demo_res = runner.run_experiment(
+            is_binary=False,
+            parent_selection_type="tournament",
+            crossover_type="two_points",
+            mutation_type="random",
+            parallel_processing=["thread", 4],
+        )
         best_hist = demo_res["best_history"]
         mean_hist = demo_res["mean_history"]
         std_hist = demo_res["std_history"]

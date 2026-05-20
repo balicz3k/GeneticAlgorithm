@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 from utils.config import AlgorithmConfig, OptimizationTarget, RepresentationType
 from utils.functions import martin_and_gaddy_function
 from operators.selection import TournamentSelection
-from operators.crossover import TwoPointCrossover
-from operators.mutation import OnePointMutation
+from operators.crossover import OnePointCrossover, TwoPointCrossover, UniformCrossover, DiscreteCrossover
+from operators.mutation import MarginalMutation, OnePointMutation, TwoPointMutation
 from operators.inversion import ClassicalInversion
 from operators.real_crossover import ArithmeticCrossover, LinearCrossover, BlendAlphaCrossover, BlendAlphaBetaCrossover, AverageCrossover
 from operators.real_mutation import UniformMutation, GaussianMutation
@@ -25,7 +25,7 @@ FUNC = martin_and_gaddy_function
 BOUNDS = [(-20, 20), (-20, 20)]
 PRECISION = 6
 POP_SIZE = 100
-EPOCHS = 200
+EPOCHS = 100
 N_RUNS = 5  # Powtórzenia do uśrednienia
 
 IMG_DIR = "img"
@@ -69,10 +69,17 @@ def run_experiment(representation, crossover_strategy, mutation_strategy, label,
         all_times.append(result["execution_time"])
         all_best_fitness.append(result["best_fitness_value"])
 
-    # Uśrednienie po powtórzeniach
+    # U\u015brednienie po powt\u00f3rzeniach
     mean_best = np.mean(all_best_per_epoch, axis=0)
     mean_avg = np.mean(all_avg_per_epoch, axis=0)
     mean_std = np.mean(all_std_per_epoch, axis=0)
+
+    # Wewn\u0119trznie fitness jest negowany dla minimalizacji (patrz Population.evaluate_fitness).
+    # Aby raport i wykresy pokazywa\u0142y rzeczywist\u0105 warto\u015b\u0107 funkcji celu f(x), odwracamy znak.
+    mean_best = -mean_best
+    mean_avg = -mean_avg
+    true_best = -min(all_best_fitness)
+    true_avg_best = -float(np.mean(all_best_fitness))
 
     return {
         "label": label,
@@ -80,8 +87,8 @@ def run_experiment(representation, crossover_strategy, mutation_strategy, label,
         "mean_avg": mean_avg,
         "mean_std": mean_std,
         "avg_time": np.mean(all_times),
-        "avg_best_fitness": np.mean(all_best_fitness),
-        "best_fitness": min(all_best_fitness),
+        "avg_best_fitness": true_avg_best,
+        "best_fitness": true_best,
         "decoded_values": result["best_decoded_values"],
     }
 
@@ -123,13 +130,39 @@ if __name__ == "__main__":
 
     # --- Eksperymenty BINARNE ---
     print("\n[BINARY] TwoPoint Crossover + OnePoint Mutation + Inversion")
-    binary_result = run_experiment(
+    binary_results = []
+    binary_results.append(run_experiment(
         RepresentationType.BINARY,
         TwoPointCrossover(),
         OnePointMutation(),
-        "Binarna (TwoPoint + OnePoint)",
+        "Binarna (TwoPoint + OnePoint + Inv)",
         ClassicalInversion()
-    )
+    ))
+
+    print("\n[BINARY] OnePoint Crossover + Marginal Mutation (bez inwersji)")
+    binary_results.append(run_experiment(
+        RepresentationType.BINARY,
+        OnePointCrossover(),
+        MarginalMutation(),
+        "Binarna (OnePoint + Marginal)"
+    ))
+
+    print("\n[BINARY] Uniform Crossover + TwoPoint Mutation + Inversion")
+    binary_results.append(run_experiment(
+        RepresentationType.BINARY,
+        UniformCrossover(),
+        TwoPointMutation(),
+        "Binarna (Uniform + TwoPoint + Inv)",
+        ClassicalInversion()
+    ))
+
+    print("\n[BINARY] Discrete Crossover + OnePoint Mutation (bez inwersji)")
+    binary_results.append(run_experiment(
+        RepresentationType.BINARY,
+        DiscreteCrossover(prob=0.5),
+        OnePointMutation(),
+        "Binarna (Discrete + OnePoint)"
+    ))
 
     # --- Eksperymenty RZECZYWISTE ---
     real_results = []
@@ -153,7 +186,7 @@ if __name__ == "__main__":
     print("\n[REAL] Linear Crossover + Uniform Mutation")
     real_results.append(run_experiment(
         RepresentationType.REAL,
-        LinearCrossover(fitness_func=FUNC),
+        LinearCrossover(fitness_func=FUNC, is_maximization=False),
         UniformMutation(),
         "Rzeczywista (Liniowe + Uniform)"
     ))
@@ -174,7 +207,7 @@ if __name__ == "__main__":
         "Rzeczywista (Uśredniające + Gauss)"
     ))
 
-    all_results = [binary_result] + real_results
+    all_results = binary_results + real_results
 
     # --- Tabela wyników ---
     print("\n" + "=" * 90)
@@ -222,6 +255,15 @@ if __name__ == "__main__":
         "Wartość funkcji celu (najlepsza w epoce)",
         "mean_best",
         "p2_real_crossover_comparison.png"
+    )
+
+    # 5. Porównanie tylko binary — różne operatory
+    plot_comparison(
+        binary_results,
+        "Porównanie operatorów krzyżowania (chromosom binarny)",
+        "Wartość funkcji celu (najlepsza w epoce)",
+        "mean_best",
+        "p2_binary_crossover_comparison.png"
     )
 
     print("\nGOTOWE! Wykresy zapisane w katalogu img/")

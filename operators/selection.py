@@ -37,9 +37,16 @@ class TournamentSelection(SelectionStrategy):
         self.tournament_size = tournament_size
     
     def select(self, population: Population, num_parents: int) -> List[Chromosome]:
+        # Zabezpieczenie: rozmiar turnieju nie może być większy niż populacja.
+        effective_size = min(self.tournament_size, len(population.individuals))
+        if effective_size < 1:
+            raise ValueError("Tournament selection requires a non-empty population.")
+
         selected_individuals = []
         for _ in range(num_parents):
-            tournament_indices = np.random.choice(len(population.individuals), size=self.tournament_size, replace=False)
+            tournament_indices = np.random.choice(
+                len(population.individuals), size=effective_size, replace=False
+            )
             tournament_combatants = [population.individuals[i] for i in tournament_indices]
             winner = max(tournament_combatants, key=lambda chrom: chrom.fitness)
             selected_individuals.append(winner.clone())

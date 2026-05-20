@@ -53,3 +53,5 @@ Icon
 *.csv
 outputs/
 results/
+
+docs/*

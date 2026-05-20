@@ -27,10 +27,16 @@ class ArithmeticCrossover(RealCrossoverStrategy):
 
 
 class LinearCrossover(RealCrossoverStrategy):
-    """Krzyżowanie liniowe — generuje 3 potomków, wybiera 2 najlepszych."""
+    """Krzyżowanie liniowe — generuje 3 potomków, wybiera 2 najlepszych.
 
-    def __init__(self, fitness_func=None):
+    Uwaga: aby poprawnie wybrać dwóch najlepszych kandydatów, operator
+    musi wiedzieć, czy problem jest minimalizacją czy maksymalizacją.
+    Domyślnie zakładamy minimalizację (zgodnie z funkcją Martin & Gaddy).
+    """
+
+    def __init__(self, fitness_func=None, is_maximization: bool = False):
         self.fitness_func = fitness_func
+        self.is_maximization = is_maximization
 
     def crossover(self, parent1: RealChromosome, parent2: RealChromosome) -> Tuple[RealChromosome, RealChromosome]:
         p1 = parent1.genes
@@ -51,10 +57,15 @@ class LinearCrossover(RealCrossoverStrategy):
             candidates.append(c)
 
         if self.fitness_func is not None:
-            candidates.sort(key=lambda c: c.fitness if c.fitness is not None else float('-inf'), reverse=True)
-            return candidates[0], candidates[1]
-        else:
-            return candidates[0], candidates[1]
+            # Dla maksymalizacji sortujemy malejąco (najwyższa wartość = najlepsza),
+            # dla minimalizacji rosnąco (najniższa wartość = najlepsza).
+            reverse = self.is_maximization
+            sentinel = float('-inf') if self.is_maximization else float('inf')
+            candidates.sort(
+                key=lambda c: c.fitness if c.fitness is not None else sentinel,
+                reverse=reverse,
+            )
+        return candidates[0], candidates[1]
 
 
 class BlendAlphaCrossover(RealCrossoverStrategy):
@@ -116,14 +127,13 @@ class AverageCrossover(RealCrossoverStrategy):
         child2 = parent2.clone()
 
         avg = (parent1.genes + parent2.genes) / 2.0
-        child1.genes = avg.copy()
-        child2.genes = avg.copy()
+        range_vec = np.array([b - a for a, b in parent1.bounds])
 
-        # Dodajemy niewielki szum do child2, aby nie były identyczne
-        noise = np.random.uniform(-0.01, 0.01, size=child2.genes.shape) * (
-            np.array([b - a for a, b in parent1.bounds])
-        )
-        child2.genes = child2.genes + noise
+        # Niewielki, symetryczny szum dla obu potomków, aby nie były identyczne.
+        noise1 = np.random.uniform(-0.01, 0.01, size=avg.shape) * range_vec
+        noise2 = np.random.uniform(-0.01, 0.01, size=avg.shape) * range_vec
+        child1.genes = avg + noise1
+        child2.genes = avg + noise2
 
         child1.clip_to_bounds()
         child2.clip_to_bounds()

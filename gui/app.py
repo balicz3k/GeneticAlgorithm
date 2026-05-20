@@ -115,6 +115,9 @@ class App(ctk.CTk):
         self.var_mut_strategy = ctk.StringVar(value="OnePoint")
         self.var_inv_strategy = ctk.StringVar(value="Classical")
 
+        self.var_blx_alpha = ctk.StringVar(value="0.5")
+        self.var_blx_beta = ctk.StringVar(value="0.25")
+
     def build_config_ui(self):
         row_id = 0
 
@@ -190,6 +193,44 @@ class App(ctk.CTk):
         # Inversion dropdown
         add_dropdown("Inversion Method:", self.var_inv_strategy, ["Classical"], tag="inversion")
 
+        add_entry("BLX Alpha (α):", self.var_blx_alpha, tag="blx_alpha")
+        add_entry("BLX Beta (β):", self.var_blx_beta, tag="blx_beta")
+
+        # Ukryj pola BLX na starcie (domyślna reprezentacja: Binary)
+        for tag in ("blx_alpha", "blx_beta"):
+            lbl, entry, _ = self.dynamic_widgets[tag]
+            lbl.grid_remove()
+            entry.grid_remove()
+
+        # Reaguj na zmianę metody krzyżowania
+        if "crossover" in self.dynamic_widgets:
+            _, opt, _ = self.dynamic_widgets["crossover"]
+            opt.configure(command=self._on_crossover_change)
+
+    def _on_crossover_change(self, value=None):
+        """Pokazuje/ukrywa pola α i β zależnie od wybranej metody krzyżowania."""
+        method = self.var_cross_strategy.get()
+        show_alpha = method in ("BLX-alpha", "BLX-alpha-beta")
+        show_beta = method == "BLX-alpha-beta"
+
+        if "blx_alpha" in self.dynamic_widgets:
+            lbl, entry, _ = self.dynamic_widgets["blx_alpha"]
+            if show_alpha:
+                lbl.grid()
+                entry.grid()
+            else:
+                lbl.grid_remove()
+                entry.grid_remove()
+
+        if "blx_beta" in self.dynamic_widgets:
+            lbl, entry, _ = self.dynamic_widgets["blx_beta"]
+            if show_beta:
+                lbl.grid()
+                entry.grid()
+            else:
+                lbl.grid_remove()
+                entry.grid_remove()
+
     def _on_representation_change(self, value=None):
         """Dynamicznie przełącza widoczne opcje operatorów zależnie od reprezentacji."""
         is_real = self.var_representation.get() == "Real"
@@ -235,6 +276,9 @@ class App(ctk.CTk):
                 bin_options = ["OnePoint", "TwoPoint", "Uniform", "Discrete"]
                 opt.configure(values=bin_options)
                 self.var_cross_strategy.set("TwoPoint")
+
+        # Przy zmianie reprezentacji ukryj/pokaż pola BLX odpowiednio
+        self._on_crossover_change()
 
         # Mutation — zmień opcje
         if "mutation" in self.dynamic_widgets:
@@ -290,9 +334,12 @@ class App(ctk.CTk):
                 # Krzyżowanie rzeczywiste
                 c_map = {
                     "Arithmetic": ArithmeticCrossover(),
-                    "Linear": LinearCrossover(fitness_func=func_pointer),
-                    "BLX-alpha": BlendAlphaCrossover(alpha=0.5),
-                    "BLX-alpha-beta": BlendAlphaBetaCrossover(alpha=0.75, beta=0.25),
+                    "Linear": LinearCrossover(
+                        fitness_func=func_pointer,
+                        is_maximization=(target == OptimizationTarget.MAXIMIZE),
+                    ),
+                    "BLX-alpha": BlendAlphaCrossover(alpha=float(self.var_blx_alpha.get())),
+                    "BLX-alpha-beta": BlendAlphaBetaCrossover(alpha=float(self.var_blx_alpha.get()), beta=float(self.var_blx_beta.get())),
                     "Averaging": AverageCrossover(),
                 }
                 # Mutacja rzeczywista
